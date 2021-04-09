@@ -19,5 +19,5 @@ day_pins = (13,17,27)
 select_pin = 4
 play_pause_pin = None
 stop_pin = 18
-ffwd_pin = 3
+ffwd_pin = 26
 rewind_pin = None
