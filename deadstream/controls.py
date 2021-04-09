@@ -118,7 +118,6 @@ class date_knob_reader:
   def venue(self):
     if self.tape_available: 
       t = self.archive.best_tape(self.fmtdate())
-      t.get_metadata()
       return t.venue()
     return ""
 
