@@ -13,6 +13,59 @@ import pkg_resources
 
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
 
+class button:
+  def __init__(self,pin,name,bouncetime=300):
+    self.pin = pin
+    self.name = name
+    self.bouncetime = bouncetime
+
+  def __str__(self):
+    return self.__repr__()
+
+  def __repr__(self):
+    return F"{self.name}: pin:{self.pin}"
+
+  def add_callback(self,pin,edge_type,cb,maxtries=3):
+    itries = 0
+    while itries < maxtries:
+      itries += 1
+      try:
+        GPIO.add_event_detect(pin,edge_type, callback = cb, bouncetime = self.bouncetime) 
+        return
+      except:
+        logging.warn(F"Retrying event_detection callback on pin {pin}")
+    logging.warn(F"Failed to set event_detection callback on pin {pin}")
+
+  def setup(self):
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(self.pin,GPIO.IN,pull_up_down=GPIO.PUD_DOWN)
+    self.add_callback(self.pin,GPIO.RISING,self.callback)
+    return None 
+
+  def show_pin_state(self,msg): 
+    logging.debug (F"{self.name} {msg}: State of pin:{GPIO.input(self.pin)}")
+    return 
+ 
+  def callback(self,channel):
+    logging.info(F"Pushed button {self.name}")
+    if self.name == 'ffwd':
+       config.FFWD = True 
+       logging.info(F"Setting FFWD to {config.FFWD}")
+    if self.name == 'rewind':
+       config.REWIND = True 
+       logging.info(F"Setting REWIND to {config.REWIND}")
+    if self.name == 'play_pause':
+       if config.PLAY_STATE in [config.READY, config.PAUSED, config.STOPPED]: config.PLAY_STATE = config.PLAYING  # play if not playing
+       elif config.PLAY_STATE == config.PLAYING: config.PLAY_STATE = config.PAUSED   # Pause if playing
+       logging.info(F"Setting PLAY_STATE to {config.PLAY_STATES[config.PLAY_STATE]}")
+    if self.name == 'stop':
+       if config.PLAY_STATE in [config.PLAYING, config.PAUSED]: config.PLAY_STATE = config.STOPPED  # stop playing or pausing
+       logging.info(F"Setting PLAY_STATE to {config.PLAY_STATES[config.PLAY_STATE]}")
+
+  def cleanup(self): 
+    GPIO.cleanup()
+
+ 
 class knob:
   def __init__(self,pins,name,values,init=None,bouncetime=300):
     self.cl, self.dt, self.sw = pins

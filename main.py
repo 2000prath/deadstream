@@ -102,6 +102,11 @@ def main(parms):
     y = ctl.knob(config.year_pins,"year",range(1965,1996),1979)   # cl, dt, sw
     m = ctl.knob(config.month_pins,"month",range(1,13),11)
     d = ctl.knob(config.day_pins,"day",range(1,32),2,bouncetime=100)
+ 
+    play_pause = ctl.button(config.play_pause_pin,"play_pause")
+    ffwd = ctl.button(config.ffwd_pin,"ffwd")
+    #rewind = ctl.button(config.rewind_pin,"rewind")
+    stop = ctl.button(config.stop_pin,"stop")
 
     scr = ctl.screen()
     scr.clear()
