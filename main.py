@@ -103,7 +103,8 @@ def main(parms):
     m = ctl.knob(config.month_pins,"month",range(1,13),11)
     d = ctl.knob(config.day_pins,"day",range(1,32),2,bouncetime=100)
  
-    play_pause = ctl.button(config.play_pause_pin,"play_pause")
+    select = ctl.button(config.select_pin,"select")
+    #play_pause = ctl.button(config.play_pause_pin,"play_pause")
     ffwd = ctl.button(config.ffwd_pin,"ffwd")
     #rewind = ctl.button(config.rewind_pin,"rewind")
     stop = ctl.button(config.stop_pin,"stop")
@@ -111,7 +112,7 @@ def main(parms):
     scr = ctl.screen()
     scr.clear()
     scr.show_text("Grateful\n  Dead\n   Streamer",color=(0,255,255))
-    _ = [x.setup() for x in [y,m,d]]
+    _ = [x.setup() for x in [y,m,d,select,ffwd,stop]]
 
     logging.info ("Loading GD Archive")
     a = GD.GDArchive('/home/steve/projects/deadstream/metadata')
