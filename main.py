@@ -104,12 +104,12 @@ def main(parms):
     d = ctl.knob(config.day_pins,"day",range(1,32),2,bouncetime=100)
     _ = [x.setup() for x in [y,m,d]]
  
-    #select = ctl.button(config.select_pin,"select")
-    #play_pause = ctl.button(config.play_pause_pin,"play_pause")
-    #ffwd = ctl.button(config.ffwd_pin,"ffwd")
-    #rewind = ctl.button(config.rewind_pin,"rewind")
-    #stop = ctl.button(config.stop_pin,"stop")
-    #_ = [x.setup() for x in [select,play_pause,ffwd,rewind,stop]]
+    select = ctl.button(config.select_pin,"select")
+    play_pause = ctl.button(config.play_pause_pin,"play_pause")
+    ffwd = ctl.button(config.ffwd_pin,"ffwd")
+    rewind = ctl.button(config.rewind_pin,"rewind")
+    stop = ctl.button(config.stop_pin,"stop")
+    _ = [x.setup() for x in [select,play_pause,ffwd,rewind,stop]]
 
     scr = ctl.screen()
     scr.clear()
