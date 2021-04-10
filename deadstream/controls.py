@@ -37,6 +37,7 @@ class button:
     logging.warn(F"Failed to set event_detection callback on pin {pin}")
 
   def setup(self):
+    if self.pin == None: return
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(self.pin,GPIO.IN,pull_up_down=GPIO.PUD_DOWN)
     self.add_callback(self.pin,GPIO.RISING,self.callback)

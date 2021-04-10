@@ -16,8 +16,15 @@ year_pins = (16,22,23)   # cl, dt, sw
 month_pins = (12,5,6)
 day_pins = (13,17,27)
 
-select_pin = 4
+select_pin = None
 play_pause_pin = None
-stop_pin = 18
-ffwd_pin = 26
 rewind_pin = None
+stop_pin = None
+ffwd_pin = None
+
+select_pin = 4   # pin 4 ok w/ Sound card
+play_pause_pin = None
+stop_pin = 20   # pin 18 interferes with sound card
+ffwd_pin = 26    # pin 26 ok with sound card.
+
+
