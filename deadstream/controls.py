@@ -18,6 +18,7 @@ class button:
     self.pin = pin
     self.name = name
     self.bouncetime = bouncetime
+    self.is_setup = False
 
   def __str__(self):
     return self.__repr__()
@@ -38,9 +39,11 @@ class button:
 
   def setup(self):
     if self.pin == None: return
+    if self.is_setup: return
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(self.pin,GPIO.IN,pull_up_down=GPIO.PUD_DOWN)
     self.add_callback(self.pin,GPIO.RISING,self.callback)
+    self.is_setup = True
     return None 
 
   def show_pin_state(self,msg): 
@@ -74,6 +77,7 @@ class knob:
     self._values = values 
     self.value = min(values) if init == None else init
     self.bouncetime = bouncetime
+    self.is_setup = False
 
   def __str__(self):
     return self.__repr__()
@@ -91,13 +95,18 @@ class knob:
       except:
         logging.warn(F"Retrying event_detection callback on pin {pin}")
     logging.warn(F"Failed to set event_detection callback on pin {pin}")
+    raise
 
   def setup(self):
+    if self.is_setup: return
     GPIO.setmode(GPIO.BCM)
     _ = [GPIO.setup(x,GPIO.IN,pull_up_down=GPIO.PUD_DOWN) for x in [self.cl,self.dt,self.sw]]
-    self.add_callback(self.sw,GPIO.RISING,self.sw_callback)
-    self.add_callback(self.dt,GPIO.FALLING,self.dt_callback)
-    self.add_callback(self.cl,GPIO.FALLING,self.cl_callback)
+    try:
+      self.add_callback(self.sw,GPIO.RISING,self.sw_callback)
+      self.add_callback(self.dt,GPIO.FALLING,self.dt_callback)
+      self.add_callback(self.cl,GPIO.FALLING,self.cl_callback)
+      self.is_setup = True
+    except: raise
     return None 
 
   def show_pin_states(self,msg): 
