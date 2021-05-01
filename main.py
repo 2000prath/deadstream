@@ -265,6 +265,9 @@ def event_loop(state,scr):
             if playstate_event.is_set():
                 scr.show_playstate()
                 playstate_event.clear()
+            if player.track_event.is_set():
+                update_tracks(state,scr)
+                player.track_event.clear()
             if q_counter and config.DATE and ((now-last_sdevent).seconds) > config.QUIESCENT_TIME:
                logger.debug(F"Reverting staged date back to selected date {(now-last_sdevent).seconds}> {config.QUIESCENT_TIME}")
                scr.show_staged_date(config.DATE)
