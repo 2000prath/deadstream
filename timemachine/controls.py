@@ -297,7 +297,6 @@ class state:
     self.date_reader.update()
     self.dict['DATE_READER'] = self.date_reader.date
     try:
-      self.dict['TRACK_NUM'] = self.player._get_property('playlist-pos')
       self.dict['TAPE_ID'] = self.player.tape.identifier
       self.dict['TRACK_TITLE'] = self.player.tape.tracks()[self.dict['TRACK_NUM']].title
       if (self.dict['TRACK_NUM']+1)<len(self.player.playlist):

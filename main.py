@@ -5,6 +5,7 @@ from timemachine import controls
 from timemachine import config
 from time import sleep
 from threading import Event
+from threading import Thread
 from typing import Callable
 from gpiozero import RotaryEncoder, Button
 from tenacity import retry
@@ -221,18 +222,24 @@ def year_button_longpress(button,state):
 
 def update_tracks(state,scr):
    current = state.get_current()
+   track_num = state.player.get_prop('playlist-pos')
+   current['TRACK_NUM'] = track_num
+   try:
+     current['TRACK_TITLE'] = state.player.tape.tracks()[track_num].title
+     if (track_num+1)<len(state.player.playlist):
+        next_track = track_num+1 
+        current['NEXT_TRACK_TITLE'] = state.player.tape.tracks()[next_track].title
+     else: 
+        current['NEXT_TRACK_TITLE'] = ''
+   except:
+     logger.warn ("Failed to get track titles")
    if current['EXPERIENCE']: 
       scr.show_experience()
    else:
      scr.show_track(current['TRACK_TITLE'],0)
      scr.show_track(current['NEXT_TRACK_TITLE'],1)
+   state.set(current)
 
-def fast_timer(state,scr):
-   current = state.get_current()
-   if current['EXPERIENCE']: return
-   scr.show_track(current['TRACK_TITLE'],0)  ## This should be a player callback.
-   scr.show_track(current['NEXT_TRACK_TITLE'],1)
-    
 def to_date(d): return datetime.datetime.strptime(d,'%Y-%m-%d').date()
 
 def play_tape(tape,player):
@@ -265,7 +272,7 @@ def event_loop(state,scr):
             if playstate_event.is_set():
                 scr.show_playstate()
                 playstate_event.clear()
-            if player.track_event.is_set():
+            if state.player.track_event.is_set():
                 update_tracks(state,scr)
                 player.track_event.clear()
             if q_counter and config.DATE and ((now-last_sdevent).seconds) > config.QUIESCENT_TIME:
@@ -276,11 +283,8 @@ def event_loop(state,scr):
         exit(0)
 
 def main(parms):
-    if parms.box == 'v0': 
-       upside_down=True
-       os.system("amixer sset 'Headphone' 100%")
-    else: 
-       upside_down = False
+    if parms.box == 'v0': upside_down=True
+    else: upside_down = False
     scr = controls.screen(upside_down=upside_down)
     scr.clear()
     scr.show_text("(\);} \n  Time\n   Machine\n     Loading...",color=(0,255,255))

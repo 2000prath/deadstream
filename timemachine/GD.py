@@ -534,11 +534,7 @@ class GDPlayer(mpv.MPV):
     self.playlist = None
     if tape != None:
       self.insert_tape(tape)
-      self.playlist = self.get_prop("playlist")
-      logger.debug (F"Playlist {self.playlist}")
-   self.loaded = Event()
-   self.track_event = Event()
-   self.loaded.wait()
+    self.track_event = Event()
 
   def __str__(self):
     return self.__repr__()
@@ -550,6 +546,8 @@ class GDPlayer(mpv.MPV):
   def insert_tape(self,tape):
     self.tape = tape
     self.create_playlist()
+    self.playlist = self.get_prop("playlist")
+    logger.debug (F"Playlist {self.playlist}")
 
   def eject_tape(self):
     self.stop()
@@ -596,6 +594,9 @@ class GDPlayer(mpv.MPV):
     if self.prop('playlist-pos')+1 == len(self.playlist): return
     self.command('playlist-next'); 
 
+  def set_volume(self,pct): # a trivial reminder of how to do it
+    self.set_property('volume',pct)
+
   def seek(self,position,relative=True): 
     if relative: self.command('seek', position)
     else: self.command('seek', position, "absolute")
@@ -631,7 +632,7 @@ class GDPlayer(mpv.MPV):
     self.track_event.set()
     logger.debug(F"in callback for playlist position:{position}, time_remaining {self.time_remaining()}")
 
-  def on_paused_for_cache(self, paused=None):
+  def on_property_paused_for_cache(self, paused=None):
     if paused is None:
         return
     logger.warn(F"in callback for paused_for_cache. time_remaining in song{self.time_remaining()}")
@@ -639,13 +640,13 @@ class GDPlayer(mpv.MPV):
   def track_status(self):
     playlist_pos = self.get_prop('playlist-pos')
     if playlist_pos == None: print (F"Playlist not started"); return None
-    print (F"Playlist at track {self.playlist[playlist_pos]}")
+    logger.debug (F"Playlist at track {self.playlist[playlist_pos]}")
     track_list = self.get_prop('track-list')
-    print(F"track_list {track-list}")
+    logger.debug (F"track_list {track_list}")
     time_pos = self.time_pos()
     time_remaining = self.time_remaining()
     if time_pos == None: print (F"Track not started"); return None
-    print(F"time: {datetime.timedelta(seconds=int(time_pos))}, time remaining: {datetime.timedelta(seconds=int(time_remaining))}")
+    logger.debug(F"time: {datetime.timedelta(seconds=int(time_pos))}, time remaining: {datetime.timedelta(seconds=int(time_remaining))}")
 
 
   def close(self): self.terminate()
