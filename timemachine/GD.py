@@ -12,8 +12,9 @@ import datetime,time,math
 import pkg_resources
 import pickle5 as pickle
 import codecs
+from threading import Event
+from . import mpv 
 from operator import attrgetter,methodcaller
-from mpv import MPV
 from importlib import reload
 
 logging.basicConfig(format='%(asctime)s.%(msecs)03d %(levelname)s: %(name)s %(message)s', level=logging.INFO,datefmt='%Y-%m-%d %H:%M:%S')
@@ -524,13 +525,20 @@ class GDSet:
     retstr = F"Grateful Dead set data"
     return retstr
   
-class GDPlayer(MPV):
+class GDPlayer(mpv.MPV):
   """ A media player to play a GDTape """
   def __init__(self,tape=None):
     super().__init__()
-    self._set_property('audio-buffer',10.0)  ## This allows to play directly from the html without a gap!
+    self.set_property('cache','yes') 
+    self.set_property('audio-buffer',10.0)  ## This allows to play directly from the html without a gap!
+    self.playlist = None
     if tape != None:
       self.insert_tape(tape)
+      self.playlist = self.get_prop("playlist")
+      logger.debug (F"Playlist {self.playlist}")
+   self.loaded = Event()
+   self.track_event = Event()
+   self.loaded.wait()
 
   def __str__(self):
     return self.__repr__()
@@ -546,7 +554,7 @@ class GDPlayer(MPV):
   def eject_tape(self):
     self.stop()
     self.tape = None
-    self.playlist_clear()
+    self.command('playlist-clear')
 
   def extract_urls(self,tape):  ## NOTE this should also give a list of backup URL's.
     tape.get_metadata()
@@ -564,40 +572,81 @@ class GDPlayer(MPV):
     return urls
   
   def create_playlist(self):
-    self.playlist_clear()
+    self.command('playlist-clear')
     urls = self.extract_urls(self.tape);
     self.command('loadfile',urls[0])
     if len(urls)>0: _ = [self.command('loadfile',x,'append') for x in urls[1:]]
-    self.playlist_pos = 0 
+    self.set_property('playlist-pos',0)
     self.pause()
-    print (F"Playlist {self.playlist}")
     return
 
   def play(self): 
-    self._set_property('pause',False)
-    self.wait_until_playing()
+    self.set_property('pause',False)
+    #self.wait_until_playing()
 
   def pause(self):
-    self._set_property('pause',True)
-    self.wait_until_paused()
+    self.set_property('pause',True)
+    #self.wait_until_paused()
 
   def stop(self): 
-    self.playlist_pos = 0
+    self.set_property('playlist-pos',0)
     self.pause()
 
   def next(self): 
-      if self._get_property('playlist-pos')+1 == len(self.playlist): return
-      self.command('playlist-next'); 
+    if self.prop('playlist-pos')+1 == len(self.playlist): return
+    self.command('playlist-next'); 
+
+  def seek(self,position,relative=True): 
+    if relative: self.command('seek', position)
+    else: self.command('seek', position, "absolute")
+
+  def get_prop(self,property_name):
+    try:
+      val = self.get_property(property_name)
+      return val
+    except:
+      return None
+
+  def time_pos(self):
+    return self.get_prop('time-pos')
+
+  def time_remaining(self):
+    return self.get_prop('time-remaining')
+
+  def cache_state(self):
+   return self.get_prop('demuxer-cache-state')
 
   def prev(self): 
-      if self._get_property('playlist-pos') == 0: return
-      self.command('playlist-prev'); 
+    if self.get_prop('playlist-pos') == 0: return
+    self.command('playlist-prev'); 
+
+#  def on_property_demuxer_cache_state(self, state=None):
+#    if state is None:
+#      return
+#    print(F"in callback for demuxer-cache-state:{state}")
+
+  def on_property_playlist_pos(self, position=None):
+    if position is None:
+      return
+    self.track_event.set()
+    logger.debug(F"in callback for playlist position:{position}, time_remaining {self.time_remaining()}")
+
+  def on_paused_for_cache(self, paused=None):
+    if paused is None:
+        return
+    logger.warn(F"in callback for paused_for_cache. time_remaining in song{self.time_remaining()}")
 
   def track_status(self):
-    if self.playlist_pos == None: print (F"Playlist not started"); return None
-    print (F"Playlist at track {self.playlist[self.playlist_pos]}")
-    if self.raw.time_pos == None: print (F"Track not started"); return None
-    print(F"time: {datetime.timedelta(seconds=int(self.raw.time_pos))}, time remaining: {datetime.timedelta(seconds=int(self.raw.time_remaining))}")
+    playlist_pos = self.get_prop('playlist-pos')
+    if playlist_pos == None: print (F"Playlist not started"); return None
+    print (F"Playlist at track {self.playlist[playlist_pos]}")
+    track_list = self.get_prop('track-list')
+    print(F"track_list {track-list}")
+    time_pos = self.time_pos()
+    time_remaining = self.time_remaining()
+    if time_pos == None: print (F"Track not started"); return None
+    print(F"time: {datetime.timedelta(seconds=int(time_pos))}, time remaining: {datetime.timedelta(seconds=int(time_remaining))}")
+
 
   def close(self): self.terminate()
 

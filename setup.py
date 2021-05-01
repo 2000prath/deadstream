@@ -7,7 +7,6 @@ setup(
     install_requires=[
         'aiohttp',
         'requests',
-        'python-mpv',
         'RPi.GPIO',
         'adafruit-blinka',
         'adafruit-circuitpython-rgb-display',
