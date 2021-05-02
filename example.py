@@ -12,7 +12,7 @@ import sys
 import time
 import threading
 
-from mpv import MPV
+from timemachine.mpv import MPV
 
 
 class MyMPV(MPV):

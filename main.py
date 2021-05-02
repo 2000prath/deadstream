@@ -158,9 +158,26 @@ def rewind_button(button,state):
    if current['TRACK_NUM']<len(state.player.playlist): state.player.next()
    track_event.set()
 
-def rewind_button_longpress(button,state):
+def rewind_button_longpress(button,state,jumpsize=15):
    logger.debug ("longpress of rewind")
-   state.player.seek(3)
+   player = state.player
+   time_pos = player.get_prop('time-remaining')
+   time_remaining = player.get_prop('time-remaining')
+   tracknum = player.get_prop('playlist-pos')
+   if time_pos < jumpsize:
+       if tracknum>0:
+         player.set_prop('playlist-pos',tracknum-1)
+         player.file_loaded_event.wait(timeout=5)
+         if player.file_loaded_event.is_set():
+           player.file_loaded_event.clear()
+           time_remaining = player.get_prop('time-remaining')
+           player.seek(max(0,time_remaining-(jumpsize-time_pos)),'absolute')
+         else:
+           logger.warning("Failed to seek beyond track boundary")
+       else:
+         player.seek(0,'absolute')
+   else:
+     state.player.seek(-1*jumpsize)
    track_event.set()
 
 def ffwd_button(button,state):

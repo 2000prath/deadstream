@@ -535,6 +535,7 @@ class GDPlayer(mpv.MPV):
     if tape != None:
       self.insert_tape(tape)
     self.track_event = Event()
+    self.file_loaded_event = Event()
 
   def __str__(self):
     return self.__repr__()
@@ -597,9 +598,8 @@ class GDPlayer(mpv.MPV):
   def set_volume(self,pct): # a trivial reminder of how to do it
     self.set_property('volume',pct)
 
-  def seek(self,position,relative=True): 
-    if relative: self.command('seek', position)
-    else: self.command('seek', position, "absolute")
+  def seek(self,position,mode='relative'): 
+    self.command('seek', position,mode)
 
   def get_prop(self,property_name):
     try:
@@ -625,6 +625,10 @@ class GDPlayer(mpv.MPV):
 #    if state is None:
 #      return
 #    print(F"in callback for demuxer-cache-state:{state}")
+
+
+  def on_file_loaded(self):
+    self.file_loaded_event.set()
 
   def on_property_playlist_pos(self, position=None):
     if position is None:
