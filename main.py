@@ -59,6 +59,7 @@ def select_tape(tape,state):
    logger.info(F"Set TAPE_ID to {current['TAPE_ID']}")
    current['TRACK_NUM'] = -1
    current['DATE'] = state.date_reader.date
+   logger.debug(F"Set DATE to {current['DATE']}")
    state.player.insert_tape(tape)
    state.set(current)
 
@@ -75,6 +76,8 @@ def select_button(button,state):
    else: 
      tape = tapes[0] 
      select_tape(tape,state)
+     current = state.get_current()
+     logger.debug(F"date is read again from state as {current['DATE']}")
      select_event.set()
 
 def select_button_longpress(button,state,scr):
@@ -232,7 +235,7 @@ def update_tracks(state,scr):
      else: 
         current['NEXT_TRACK_TITLE'] = ''
    except:
-     logger.warn ("Failed to get track titles")
+     logger.warning ("Failed to get track titles")
    if current['EXPERIENCE']: 
       scr.show_experience()
    else:
@@ -265,8 +268,9 @@ def event_loop(state,scr):
                 update_tracks(state,scr)
                 track_event.clear()
             if select_event.is_set():
-                current = state.get_current()
-                scr.show_selected_date(current['DATE'])
+                #current = state.get_current()
+                #state.set(current)
+                scr.show_selected_date(config.DATE)
                 update_tracks(state,scr)
                 select_event.clear()
             if playstate_event.is_set():
@@ -274,7 +278,7 @@ def event_loop(state,scr):
                 playstate_event.clear()
             if state.player.track_event.is_set():
                 update_tracks(state,scr)
-                player.track_event.clear()
+                state.player.track_event.clear()
             if q_counter and config.DATE and ((now-last_sdevent).seconds) > config.QUIESCENT_TIME:
                logger.debug(F"Reverting staged date back to selected date {(now-last_sdevent).seconds}> {config.QUIESCENT_TIME}")
                scr.show_staged_date(config.DATE)
@@ -331,7 +335,11 @@ def main(parms):
     scr.clear()
     scr.show_text("Powered by\n archive.org \n turn knobs \n to select date",color=(0,255,255))
 
-    event_loop(state,scr)
+    el = Thread(target=event_loop,args=(state,scr))
+    el.run()
+    el.join()
+
+    #event_loop(state,scr)
 
     [x.cleanup() for x in [y,m,d]] ## redundant, only one cleanup is needed!
 
