@@ -591,7 +591,7 @@ class GDPlayer(mpv.MPV):
     self.pause()
 
   def next(self): 
-    if self.prop('playlist-pos')+1 == len(self.playlist): return
+    if self.get_prop('playlist-pos')+1 == len(self.playlist): return
     self.command('playlist-next'); 
 
   def set_volume(self,pct): # a trivial reminder of how to do it
