@@ -77,7 +77,6 @@ def select_button(button,state):
      tape = tapes[0] 
      select_tape(tape,state)
      current = state.get_current()
-     logger.debug(F"date is read again from state as {current['DATE']}")
      select_event.set()
 
 def select_button_longpress(button,state,scr):
@@ -154,31 +153,12 @@ def rewind_button(button,state):
    current = state.get_current()
    if current['EXPERIENCE']: return 
    sleep(button._hold_time)
-   if button.is_pressed: return # the button is being "held"
-   if current['TRACK_NUM']<len(state.player.playlist): state.player.next()
-   track_event.set()
+   if button.is_pressed: return 
+   if current['TRACK_NUM']>0: state.player.prev()
 
 def rewind_button_longpress(button,state,jumpsize=15):
    logger.debug ("longpress of rewind")
-   player = state.player
-   time_pos = player.get_prop('time-remaining')
-   time_remaining = player.get_prop('time-remaining')
-   tracknum = player.get_prop('playlist-pos')
-   if time_pos < jumpsize:
-       if tracknum>0:
-         player.set_prop('playlist-pos',tracknum-1)
-         player.file_loaded_event.wait(timeout=5)
-         if player.file_loaded_event.is_set():
-           player.file_loaded_event.clear()
-           time_remaining = player.get_prop('time-remaining')
-           player.seek(max(0,time_remaining-(jumpsize-time_pos)),'absolute')
-         else:
-           logger.warning("Failed to seek beyond track boundary")
-       else:
-         player.seek(0,'absolute')
-   else:
-     state.player.seek(-1*jumpsize)
-   track_event.set()
+   state.player.rseek(jumpsize)
 
 def ffwd_button(button,state):
    current = state.get_current()
@@ -188,10 +168,9 @@ def ffwd_button(button,state):
    if current['TRACK_NUM']<len(state.player.playlist): state.player.next()
    track_event.set()
 
-def ffwd_button_longpress(button,state):
+def ffwd_button_longpress(button,state,jumpsize=15):
    logger.debug ("longpress of ffwd")
-   state.player.seek(3)
-   track_event.set()
+   state.player.fseek(jumpsize)
 
 def month_button(button,state):
    current = state.get_current()
@@ -287,8 +266,10 @@ def event_loop(state,scr):
             if select_event.is_set():
                 #current = state.get_current()
                 #state.set(current)
+                state.player.file_loaded_event.wait(5)
                 scr.show_selected_date(config.DATE)
                 update_tracks(state,scr)
+                state.player.file_loaded_event.clear()
                 select_event.clear()
             if playstate_event.is_set():
                 scr.show_playstate()
