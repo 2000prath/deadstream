@@ -16,9 +16,17 @@ from threading import Event
 from . import mpv 
 from operator import attrgetter,methodcaller
 from importlib import reload
+from tenacity import retry
+from tenacity.stop import stop_after_delay
+from typing import Callable
 
 logging.basicConfig(format='%(asctime)s.%(msecs)03d %(levelname)s: %(name)s %(message)s', level=logging.INFO,datefmt='%Y-%m-%d %H:%M:%S')
 logger = logging.getLogger(__name__)
+
+@retry(stop=stop_after_delay(10))
+def retry_call(callable: Callable, *args, **kwargs):
+    """Retry a call."""
+    return callable(*args, **kwargs)
 
 class BaseTapeDownloader(abc.ABC):
     """Abstract base class for a Grateful Dead tape downloader.
@@ -577,7 +585,7 @@ class GDPlayer(mpv.MPV):
     if len(urls)>0: _ = [self.command('loadfile',x,'append') for x in urls[1:]]
     self.file_loaded_event.clear()
     self.set_property('playlist-pos',0)
-    self.file_loaded_event.wait(timeout=5)
+    self.file_loaded_event.wait(timeout=30)
     self.file_loaded_event.clear()
     self.pause()
     return
@@ -606,11 +614,7 @@ class GDPlayer(mpv.MPV):
     self.command('seek', position,mode)
 
   def get_prop(self,property_name):
-    try:
-      val = self.get_property(property_name)
-      return val
-    except:
-      return None
+    return retry_call(self.get_property, property_name)
 
   def time_pos(self):
     return self.get_prop('time-pos')
@@ -636,92 +640,94 @@ class GDPlayer(mpv.MPV):
     logger.debug("file_loaded_event set")
     self.file_loaded_event.set()
 
-  def on_seek(self):
-    logger.debug("seek event triggered")
+#  def on_seek(self):
+#    logger.debug("seek event triggered")
 
   def on_property_playlist_pos(self, position=None):
     if position is None:
       return
     self.track_event.set()
+    self.file_loaded_event.clear()
     logger.debug(F"in callback for playlist position:{position}, time_remaining {self.time_remaining()}")
 
-  def on_property_paused_for_cache(self, paused=None):
-    if paused is None:
-        return
-    logger.warn(F"in callback for paused_for_cache. time_remaining in song{self.time_remaining()}")
+#  def on_property_paused_for_cache(self, paused=None):
+#    if paused is None:
+#        return
+#    logger.warn(F"in callback for paused_for_cache. time_remaining in song {self.time_remaining()}")
 
-  def fseek(self,jumpsize=15):
-     logger.debug ("longpress of ffwd")
-     time_pos = self.get_prop('audio-pts')
-     time_remaining = self.get_prop('time-remaining')
-     tracknum = self.get_prop('playlist-pos')
-     while time_pos == None:
-       time.sleep(1)
-       time_pos = self.get_prop('audio-pts')
-       time_remaining = self.get_prop('time-remaining')
-       logger.debug (F"time pos: {time_pos} time remaining: {time_remaining}")
-     logger.debug (F"forwarding {jumpsize} s from {time_pos} with {time_remaining}")
-     if time_remaining < jumpsize:
-       if tracknum < len(self.playlist):
-         self.file_loaded_event.clear()
-         self.set_property('playlist-pos',tracknum+1)
-         self.file_loaded_event.wait(timeout=20)
-         logger.debug (F"track changed from {tracknum} to {tracknum-1}")
-         if self.file_loaded_event.is_set():
-           self.file_loaded_event.clear()
-           tracknum = tracknum + 1
-           time_remaining = self.get_prop('time-remaining')
-           logger.debug (F"file loaded. seeking to {min(time_remaining,jumpsize)}")
-           self.seek(min(time_remaining,jumpsize),'relative')
-         else:
-           logger.warning("Failed to seek beyond track boundary")
-       else:
-         self.seek(0,'absolute')
-     else:
-       self.seek(-1*jumpsize)
+  def seek_to(self,track_no,destination=0.0,threshold=1):
+    try:
+      if track_no < 0 or track_no > len(self.playlist):
+        raise Exception ('seek_to track_no out of bounds')
+      paused = self.get_property('pause')
+      current_track = self.get_property('playlist-pos')
+      if current_track != track_no: self.set_property('playlist-pos',track_no)
+      self.set_property('pause',paused)
+      loaded = self.file_loaded_event.wait(timeout=30)
+      duration = self.get_prop('duration') 
+      if destination < 0: destination = duration + destination
+      if (destination > duration) or (destination < 0):
+        raise Exception (F'seek_to destination {destination}, out of bounds (0,{duration})')
 
+      self.seek(destination,'absolute') 
+      time_pos = self.get_prop('audio-pts')
+      logger.debug(F'time_pos {time_pos}. duration {duration}')
+      if abs(time_pos-destination) > threshold:
+          raise Exception(F'Not close enough: time_pos - destination ({time_pos-destination})>{threshold}')
+    except mpv.MPVCommandError as e:
+      logger.warning (F"MPVCommandError: {e} .. retrying")
+      time.sleep(2)
+      self.seek_to(track_no,destination,threshold)
+    except Exception as e:
+      logger.warning (e)
+    finally:
+      pass      
 
-  def rseek(self,jumpsize=15):
-     logger.debug ("longpress of rewind")
-     time_pos = self.get_prop('audio-pts')
-     time_remaining = self.get_prop('time-remaining')
-     tracknum = self.get_prop('playlist-pos')
-     while time_pos == None:
-       time.sleep(1)
-       time_pos = self.get_prop('audio-pts')
-       time_remaining = self.get_prop('time-remaining')
-       logger.debug (F"time pos: {time_pos} time remaining: {time_remaining}")
-     logger.debug (F"rewinding {jumpsize} s from {time_pos} with {time_remaining}")
-     if time_pos < jumpsize:
-       if tracknum>0:
-         self.file_loaded_event.clear()
-         self.set_property('playlist-pos',tracknum-1)
-         self.file_loaded_event.wait(timeout=20)
-         logger.debug (F"track changed from {tracknum} to {tracknum-1}")
-         if self.file_loaded_event.is_set():
-           tracknum = tracknum - 1
-           self.file_loaded_event.clear()
-           time_remaining = self.get_prop('time-remaining')
-           logger.debug (F"file loaded. seeking to {max(0,time_remaining-(jumpsize-time_pos))}")
-           self.seek(max(0,time_remaining-(jumpsize-time_pos)),'absolute')
-         else:
-           logger.warning("Failed to seek beyond track boundary")
-       else:
-         self.seek(0,'absolute')
-     else:
-       self.seek(-1*jumpsize)
+  def fseek(self,jumpsize=30,sleeptime=2):
+    try:
+      logger.debug(F"fseeking. jumpsize {jumpsize}")
 
-  def track_status(self):
+      current_track = self.get_prop('playlist-pos')
+      time_remaining = self.get_prop('time-remaining')
+      time_pos = self.get_prop('audio-pts')
+      if time_pos == None: time_pos = 0
+      time_pos = max(0,time_pos)
+      duration = self.get_prop('duration')
+      if duration == None: 
+        raise Exception('could not get duration')
+
+      destination = time_pos + jumpsize 
+      logger.debug(F" Destination {destination} duration {duration} time_pos {time_pos}")
+
+      if destination < 0: 
+        if abs(destination) < abs(5*sleeptime):  # if moving back to end of prev track, go back a bit further
+           destination = destination - 4*sleeptime
+        self.seek_to(current_track-1,destination)
+      elif destination > duration: 
+        self.seek_to(current_track+1,destination-duration)
+      else:
+        self.seek_to(current_track,destination)
+    except Exception as e:
+      logger.warning (F"exception in seeking {e}")
+    finally:
+      logger.debug ("in finally clause")
+      time.sleep(sleeptime)
+
+  def status(self):
     playlist_pos = self.get_prop('playlist-pos')
     if playlist_pos == None: print (F"Playlist not started"); return None
-    logger.debug (F"Playlist at track {self.playlist[playlist_pos]}")
-    track_list = self.get_prop('track-list')
-    logger.debug (F"track_list {track_list}")
+    logger.info (F"Playlist pos {playlist_pos}")
+    #track_list = self.get_prop('track-list')
+    #logger.debug (F"track_list {track_list}")
+    paused = self.get_property('pause')
     time_pos = self.time_pos()
     time_remaining = self.time_remaining()
-    if time_pos == None: print (F"Track not started"); return None
-    logger.debug(F"time: {datetime.timedelta(seconds=int(time_pos))}, time remaining: {datetime.timedelta(seconds=int(time_remaining))}")
-
+    duration = self.get_prop('duration')
+    dcs = self.get_prop('demuxer-cache-state')
+    if time_pos == None: print (F"Track not started")
+#    logger.info(F"duration {duration}. time: {datetime.timedelta(seconds=int(time_pos))}, time remaining: {datetime.timedelta(seconds=int(time_remaining))}")
+    logger.info(F"paused? {paused}. Duration {duration}. time-pos: {time_pos}, time-remaining: {time_remaining}")
+    if dcs != None: logger.info(F"seekable ranges: {dcs['seekable-ranges']}")
 
   def close(self): self.terminate()
 
