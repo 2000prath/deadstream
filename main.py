@@ -156,9 +156,10 @@ def rewind_button(button,state):
    if button.is_pressed: return 
    if current['TRACK_NUM']>0: state.player.prev()
 
-def rewind_button_longpress(button,state,jumpsize=15):
+def rewind_button_longpress(button,state,jumpsize=30,sleeptime=2):
    logger.debug ("longpress of rewind")
-   state.player.rseek(jumpsize)
+   while button.is_held:
+     state.player.fseek(-1*abs(jumpsize),sleeptime=sleeptime)
 
 def ffwd_button(button,state):
    current = state.get_current()
@@ -168,9 +169,10 @@ def ffwd_button(button,state):
    if current['TRACK_NUM']<len(state.player.playlist): state.player.next()
    track_event.set()
 
-def ffwd_button_longpress(button,state,jumpsize=15):
+def ffwd_button_longpress(button,state,jumpsize=30,sleeptime=2):
    logger.debug ("longpress of ffwd")
-   state.player.fseek(jumpsize)
+   while button.is_held:
+     state.player.fseek(jumpsize,sleeptime=sleeptime)
 
 def month_button(button,state):
    current = state.get_current()
@@ -307,8 +309,8 @@ def main(parms):
     d_button = retry_call(Button, config.day_pins[2])
     select = retry_call(Button, config.select_pin,hold_time = 0.5,hold_repeat = False)
     play_pause = retry_call(Button, config.play_pause_pin,hold_time = 5)
-    ffwd = retry_call(Button, config.ffwd_pin,hold_time = 0.5,hold_repeat = True)
-    rewind = retry_call(Button, config.rewind_pin,hold_time = 0.5,hold_repeat = True)
+    ffwd = retry_call(Button, config.ffwd_pin,hold_time = 0.5,hold_repeat = False)
+    rewind = retry_call(Button, config.rewind_pin,hold_time = 0.5,hold_repeat = False)
     stop = retry_call(Button, config.stop_pin,hold_time = 5)
 
     play_pause.when_pressed = lambda button: play_pause_button(button,state,scr)
