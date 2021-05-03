@@ -531,11 +531,11 @@ class GDPlayer(mpv.MPV):
     super().__init__()
     self.set_property('cache','yes') 
     self.set_property('audio-buffer',10.0)  ## This allows to play directly from the html without a gap!
+    self.track_event = Event()
+    self.file_loaded_event = Event()
     self.playlist = None
     if tape != None:
       self.insert_tape(tape)
-    self.track_event = Event()
-    self.file_loaded_event = Event()
 
   def __str__(self):
     return self.__repr__()
@@ -575,7 +575,10 @@ class GDPlayer(mpv.MPV):
     urls = self.extract_urls(self.tape);
     self.command('loadfile',urls[0])
     if len(urls)>0: _ = [self.command('loadfile',x,'append') for x in urls[1:]]
+    self.file_loaded_event.clear()
     self.set_property('playlist-pos',0)
+    self.file_loaded_event.wait(timeout=5)
+    self.file_loaded_event.clear()
     self.pause()
     return
 
@@ -588,6 +591,7 @@ class GDPlayer(mpv.MPV):
     #self.wait_until_paused()
 
   def stop(self): 
+    self.file_loaded_event.clear()
     self.set_property('playlist-pos',0)
     self.pause()
 
@@ -619,6 +623,7 @@ class GDPlayer(mpv.MPV):
 
   def prev(self): 
     if self.get_prop('playlist-pos') == 0: return
+    self.file_loaded_event.clear()
     self.command('playlist-prev'); 
 
 #  def on_property_demuxer_cache_state(self, state=None):
@@ -628,7 +633,11 @@ class GDPlayer(mpv.MPV):
 
 
   def on_file_loaded(self):
+    logger.debug("file_loaded_event set")
     self.file_loaded_event.set()
+
+  def on_seek(self):
+    logger.debug("seek event triggered")
 
   def on_property_playlist_pos(self, position=None):
     if position is None:
@@ -640,6 +649,67 @@ class GDPlayer(mpv.MPV):
     if paused is None:
         return
     logger.warn(F"in callback for paused_for_cache. time_remaining in song{self.time_remaining()}")
+
+  def fseek(self,jumpsize=15):
+     logger.debug ("longpress of ffwd")
+     time_pos = self.get_prop('audio-pts')
+     time_remaining = self.get_prop('time-remaining')
+     tracknum = self.get_prop('playlist-pos')
+     while time_pos == None:
+       time.sleep(1)
+       time_pos = self.get_prop('audio-pts')
+       time_remaining = self.get_prop('time-remaining')
+       logger.debug (F"time pos: {time_pos} time remaining: {time_remaining}")
+     logger.debug (F"forwarding {jumpsize} s from {time_pos} with {time_remaining}")
+     if time_remaining < jumpsize:
+       if tracknum < len(self.playlist):
+         self.file_loaded_event.clear()
+         self.set_property('playlist-pos',tracknum+1)
+         self.file_loaded_event.wait(timeout=20)
+         logger.debug (F"track changed from {tracknum} to {tracknum-1}")
+         if self.file_loaded_event.is_set():
+           self.file_loaded_event.clear()
+           tracknum = tracknum + 1
+           time_remaining = self.get_prop('time-remaining')
+           logger.debug (F"file loaded. seeking to {min(time_remaining,jumpsize)}")
+           self.seek(min(time_remaining,jumpsize),'relative')
+         else:
+           logger.warning("Failed to seek beyond track boundary")
+       else:
+         self.seek(0,'absolute')
+     else:
+       self.seek(-1*jumpsize)
+
+
+  def rseek(self,jumpsize=15):
+     logger.debug ("longpress of rewind")
+     time_pos = self.get_prop('audio-pts')
+     time_remaining = self.get_prop('time-remaining')
+     tracknum = self.get_prop('playlist-pos')
+     while time_pos == None:
+       time.sleep(1)
+       time_pos = self.get_prop('audio-pts')
+       time_remaining = self.get_prop('time-remaining')
+       logger.debug (F"time pos: {time_pos} time remaining: {time_remaining}")
+     logger.debug (F"rewinding {jumpsize} s from {time_pos} with {time_remaining}")
+     if time_pos < jumpsize:
+       if tracknum>0:
+         self.file_loaded_event.clear()
+         self.set_property('playlist-pos',tracknum-1)
+         self.file_loaded_event.wait(timeout=20)
+         logger.debug (F"track changed from {tracknum} to {tracknum-1}")
+         if self.file_loaded_event.is_set():
+           tracknum = tracknum - 1
+           self.file_loaded_event.clear()
+           time_remaining = self.get_prop('time-remaining')
+           logger.debug (F"file loaded. seeking to {max(0,time_remaining-(jumpsize-time_pos))}")
+           self.seek(max(0,time_remaining-(jumpsize-time_pos)),'absolute')
+         else:
+           logger.warning("Failed to seek beyond track boundary")
+       else:
+         self.seek(0,'absolute')
+     else:
+       self.seek(-1*jumpsize)
 
   def track_status(self):
     playlist_pos = self.get_prop('playlist-pos')
