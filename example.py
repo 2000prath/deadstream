@@ -12,99 +12,43 @@ import sys
 import time
 import threading
 
-from timemachine.mpv import MPV
-
-
-class MyMPV(MPV):
-    #-------------------------------------------------------------------------
-    # Initialization.
-    #-------------------------------------------------------------------------
-
-    # The mpv process and the communication code run in their own thread
-    # context. This results in the callback methods below being run in that
-    # thread as well.
-    def __init__(self, pathlist):
-        # Pass a window id to embed mpv into that window. Change debug to True
-        # to see the json communication.
-        super().__init__(window_id=None, debug=False)
-
-        self.set_property('audio-buffer',10.0)
-        for path in pathlist:
-            self.command("loadfile", path, "append")
-
-        self.set_property("playlist-pos", 0)
-        pl = self.get_property("playlist")
-        print(pl)
-
-        self.loaded = threading.Event()
-        self.loaded.wait()
-
-    #-------------------------------------------------------------------------
-    # Callbacks
-    #-------------------------------------------------------------------------
-
-    # The MPV base class automagically registers event callback methods
-    # if they are specially named: "file-loaded" -> on_file_loaded().
-    def on_file_loaded(self):
-        self.loaded.set()
-
-    # The same applies to property change events:
-    # "time-pos" -> on_property_time_pos().
-    #def on_property_time_pos(self, position=None):
-    #    if position is None:
-    #        return
-    #    print("position:", position)
-
-    def on_property_playlist_pos(self, position=None):
-        if position is None:
-            return
-        print("in callback for playlist position:", position)
-
-
-    def on_property_length(self, length=None):
-        if length is None:
-            return
-        print("length in seconds:", length)
-
-    #-------------------------------------------------------------------------
-    # Commands
-    #-------------------------------------------------------------------------
-    # Many commands must be implemented by changing properties.
-    def play(self):
-        self.set_property("pause", False)
-
-    def pause(self):
-        self.set_property("pause", True)
-
-    def seek(self, position):
-        self.command("seek", position, "absolute")
+from timemachine import GD
 
 
 if __name__ == "__main__":
     # Open the video player and load a file.
-    try:
-        playlist = open(sys.argv[1],'r').readlines()
-        playlist = [x.rstrip() for x in playlist]
-        print(F"playlist: {playlist}")
-        mpv = MyMPV(playlist)
-    #    mpv = MyMPV(sys.argv[1])
-    except IndexError:
-        raise SystemExit("usage: python example.py <path>")
+    archive = GD.GDArchive("/home/steve/projects/deadstream/metadata")
+    tape = archive.best_tape('1979-11-02')
+    player = GD.GDPlayer(tape)
+    GD.logger.setLevel(10)
 
     # Seek to 5 minutes.
-    mpv.seek(600)
+    player.seek(600)
 
     # Start playback.
-    mpv.play()
+    player.play()
 
     # Playback for 15 seconds.
     time.sleep(15)
 
     # Pause playback.
-    mpv.pause()
+    player.pause()
 
     # Wait again.
     time.sleep(3)
 
     # Terminate the video player.
     #mpv.close()
+
+    # move to track 4
+    player.file_loaded_event.clear()
+    _ = [player.prev() for i in range(4)]
+    try:
+      player.file_loaded_event.wait(timeout = 20)
+      print (F" loaded event set?:{player.file_loaded_event.is_set()}")
+      dcs = player.get_property('demuxer-cache-state')
+      print(dcs)
+    except:
+      print (F" failed to get cache state")
+ 
+    # wait for player to be ready
