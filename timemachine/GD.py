@@ -23,7 +23,7 @@ from typing import Callable
 logging.basicConfig(format='%(asctime)s.%(msecs)03d %(levelname)s: %(name)s %(message)s', level=logging.INFO,datefmt='%Y-%m-%d %H:%M:%S')
 logger = logging.getLogger(__name__)
 
-@retry(stop=stop_after_delay(10))
+@retry(stop=stop_after_delay(20))
 def retry_call(callable: Callable, *args, **kwargs):
     """Retry a call."""
     return callable(*args, **kwargs)
@@ -648,7 +648,7 @@ class GDPlayer(mpv.MPV):
       return
     self.track_event.set()
     self.file_loaded_event.clear()
-    logger.debug(F"in callback for playlist position:{position}, time_remaining {self.time_remaining()}")
+    logger.debug(F"in callback for playlist position:{position}")
 
 #  def on_property_paused_for_cache(self, paused=None):
 #    if paused is None:
@@ -661,7 +661,9 @@ class GDPlayer(mpv.MPV):
         raise Exception ('seek_to track_no out of bounds')
       paused = self.get_property('pause')
       current_track = self.get_property('playlist-pos')
-      if current_track != track_no: self.set_property('playlist-pos',track_no)
+      if current_track != track_no: 
+        self.set_property('playlist-pos',track_no)
+        self.track_event.set() # force an update of the tracklist? 
       self.set_property('pause',paused)
       loaded = self.file_loaded_event.wait(timeout=30)
       duration = self.get_prop('duration') 
