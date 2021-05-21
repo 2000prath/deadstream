@@ -8,7 +8,7 @@ import board
 import digitalio
 from adafruit_rgb_display.st7735 import ST7735R
 from adafruit_rgb_display import color565
-from gpiozero import RotaryEncoder, Button
+from gpiozero import RotaryEncoder, Button, LED
 from tenacity import retry
 from tenacity.stop import stop_after_delay
 from PIL import Image, ImageDraw, ImageFont
