@@ -1,17 +1,19 @@
 #!/usr/bin/python3
-from time import sleep
 import datetime
-import logging
-import digitalio
-import board
 import functools
-from . import config
-import adafruit_rgb_display.st7735 as st7735
-from adafruit_rgb_display import color565
-from PIL import Image, ImageDraw, ImageFont
-import pkg_resources
-from gpiozero import RotaryEncoder, Button, LED
+import logging
+from time import sleep
 from threading import BoundedSemaphore
+
+import adafruit_rgb_display.st7735 as st7735
+import board
+import digitalio
+from adafruit_rgb_display import color565
+from gpiozero import Button, LED, RotaryEncoder
+from PIL import Image, ImageDraw, ImageFont
+
+from . import config
+import pkg_resources
 
 logging.basicConfig(format='%(asctime)s.%(msecs)03d %(levelname)s: %(name)s %(message)s', level=logging.DEBUG, datefmt='%Y-%m-%d %H:%M:%S')
 logger = logging.getLogger(__name__)
